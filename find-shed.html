@@ -525,10 +525,12 @@ section{position:relative}
 .map-placeholder .mono{font-family:monospace;background:#fff;padding:12px 18px;border-radius:3px;border:1px solid var(--line);margin-top:20px;font-size:12px;color:var(--navy)}
 .shed-list{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:28px}
 @media(max-width:820px){.shed-list{grid-template-columns:1fr}}
-.shed-item{background:#fff;border:1px solid var(--line);padding:22px 24px;border-radius:3px;display:flex;justify-content:space-between;align-items:center;gap:20px}
+.shed-item{background:#fff;border:1px solid var(--line);padding:22px 24px;border-radius:3px;display:flex;justify-content:space-between;align-items:center;gap:20px;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;transition:border-color .2s, box-shadow .2s, transform .15s}
+.shed-item:hover{border-color:var(--gold);box-shadow:0 2px 8px rgba(27,42,74,.08)}
+.shed-item:active{transform:scale(.998)}
 .shed-item h5{font-family:var(--kserif);font-weight:700;font-size:16px;color:var(--navy);margin-bottom:4px}
 .shed-item .addr{font-size:13px;color:var(--muted);font-family:var(--util)}
-.shed-item .visit{font-family:var(--util);font-size:12px;color:var(--gold);font-weight:700;letter-spacing:.06em;text-decoration:none;white-space:nowrap}
+.shed-item .focus{font-family:var(--util);font-size:11px;color:var(--gold);font-weight:700;letter-spacing:.08em;white-space:nowrap}
 
 /* Guide steps */
 .step-list{counter-reset:step;margin-top:34px}
@@ -650,7 +652,7 @@ section{position:relative}
 <section class="sec">
   <div class="wrap">
     <span class="sec-tag">2-2 · 전국 지도</span>
-    <h2 class="sec-title">현재 <span class="accent">6곳</span>의 셰드가 활동 중입니다.</h2>
+    <h2 class="sec-title">현재 <span class="accent" id="shedCount">0</span>곳의 셰드가 활동 중입니다.</h2>
 
     <!-- Kakao Map container (JS loads sheds.json and populates markers) -->
     <div id="kakaomap">
@@ -771,30 +773,48 @@ section{position:relative}
       iconAnchor: [8, 8],
     });
 
+    const markers = [];
     sheds.forEach(s => {
       const pending = (s.name || '').includes('준비 중');
       const marker = L.marker([s.lat, s.lng], { icon: createIcon(pending), title: s.name }).addTo(map);
       marker.bindPopup(`
         <strong>${s.name}</strong>
         <span>${s.address}</span>
-        ${s.url ? `<br><a href="${s.url}" style="color:#B8975A;font-weight:600;font-size:12px">방문 →</a>` : ''}
       `);
+      markers.push(marker);
     });
 
-    renderShedList(sheds);
+    // Update the count in the section title to match what we actually show
+    const countEl = document.getElementById('shedCount');
+    if (countEl) countEl.textContent = sheds.length;
+
+    renderShedList(sheds, map, markers, container);
   })();
 
-  function renderShedList(sheds) {
+  function renderShedList(sheds, map, markers, mapContainer) {
     const list = document.getElementById('shedList');
-    list.innerHTML = sheds.map(s => `
-      <div class="shed-item">
+    list.innerHTML = sheds.map((s, i) => `
+      <button type="button" class="shed-item" data-idx="${i}" aria-label="${s.name} 지도에서 보기">
         <div>
           <h5>${s.name}</h5>
           <div class="addr">${s.address}</div>
         </div>
-        ${s.url ? `<a class="visit" href="${s.url}" target="_blank" rel="noopener">방문 →</a>` : ''}
-      </div>
+        <span class="focus">지도에서 보기 →</span>
+      </button>
     `).join('');
+
+    list.querySelectorAll('.shed-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.idx, 10);
+        const s = sheds[i];
+        if (!s) return;
+        // Scroll map into view first (mobile — list often sits below the map)
+        mapContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Then fly to the shed and open its popup
+        map.flyTo([s.lat, s.lng], 15, { duration: 0.9 });
+        setTimeout(() => markers[i].openPopup(), 850);
+      });
+    });
   }
 </script>
 </body>
